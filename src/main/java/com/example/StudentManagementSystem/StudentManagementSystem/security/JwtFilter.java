@@ -13,16 +13,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import java.security.Key;
+
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final String SECRET_KEY = "mysecretkeymysecretkeymysecretkey";
+    private static final String SECRET =
+            "mysecretkeymysecretkeymysecretkey12";
 
     @Autowired
     private UserDetailsService userDetailsService;
@@ -39,25 +43,40 @@ public class JwtFilter extends OncePerRequestFilter {
         String token = null;
         String username = null;
 
-        // Check Bearer Token
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        // Check Authorization Header
+        if (authHeader != null &&
+                authHeader.startsWith("Bearer ")) {
 
             token = authHeader.substring(7);
 
-            Claims claims = Jwts.parser()
-                    .setSigningKey(SECRET_KEY)
-                    .parseClaimsJws(token)
-                    .getBody();
+            try {
 
-            username = claims.getSubject();
+                Key key = Keys.hmacShaKeyFor(
+                        SECRET.getBytes());
+
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(key)
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody();
+
+                username = claims.getSubject();
+
+            } catch (Exception e) {
+
+                System.out.println("JWT ERROR : " + e.getMessage());
+            }
         }
 
         // Authenticate User
         if (username != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication() == null) {
 
             UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+                    userDetailsService
+                            .loadUserByUsername(username);
 
             UsernamePasswordAuthenticationToken authToken =
                     new UsernamePasswordAuthenticationToken(
@@ -69,7 +88,8 @@ public class JwtFilter extends OncePerRequestFilter {
                     new WebAuthenticationDetailsSource()
                             .buildDetails(request));
 
-            SecurityContextHolder.getContext()
+            SecurityContextHolder
+                    .getContext()
                     .setAuthentication(authToken);
         }
 
