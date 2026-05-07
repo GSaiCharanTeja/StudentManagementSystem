@@ -2,94 +2,75 @@ package com.example.StudentManagementSystem.StudentManagementSystem.security;
 
 import java.io.IOException;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import java.util.Collections;
-
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-
-import org.springframework.security.core.context.SecurityContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
-import org.springframework.web.filter.OncePerRequestFilter;
-
 @Component
-public class JwtFilter
-        extends OncePerRequestFilter {
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final String SECRET_KEY = "mysecretkeymysecretkeymysecretkey";
 
     @Autowired
-    private JwtService jwtService;
+    private UserDetailsService userDetailsService;
 
     @Override
     protected void doFilterInternal(
-
             HttpServletRequest request,
-
             HttpServletResponse response,
-
             FilterChain filterChain)
-
             throws ServletException, IOException {
 
-        String path = request.getServletPath();
+        String authHeader = request.getHeader("Authorization");
 
-        // Allow auth APIs
-        if(path.startsWith("/auth")) {
+        String token = null;
+        String username = null;
 
-            filterChain.doFilter(request, response);
+        // Check Bearer Token
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
 
-            return;
+            token = authHeader.substring(7);
+
+            Claims claims = Jwts.parser()
+                    .setSigningKey(SECRET_KEY)
+                    .parseClaimsJws(token)
+                    .getBody();
+
+            username = claims.getSubject();
         }
 
-        String authHeader =
-                request.getHeader("Authorization");
+        // Authenticate User
+        if (username != null &&
+                SecurityContextHolder.getContext().getAuthentication() == null) {
 
-        if(authHeader == null ||
-                !authHeader.startsWith("Bearer ")) {
+            UserDetails userDetails =
+                    userDetailsService.loadUserByUsername(username);
 
-            response.setStatus(
-                    HttpServletResponse.SC_UNAUTHORIZED);
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities());
 
-            response.getWriter().write(
-                    "Missing or Invalid Token");
+            authToken.setDetails(
+                    new WebAuthenticationDetailsSource()
+                            .buildDetails(request));
 
-            return;
-        }
-
-        String token =
-                authHeader.substring(7);
-
-        try {
-
-        	String username =
-        	        jwtService.extractUsername(token);
-
-        	UsernamePasswordAuthenticationToken authToken =
-        	        new UsernamePasswordAuthenticationToken(
-        	                username,
-        	                null,
-        	                Collections.emptyList());
-
-        	SecurityContextHolder.getContext()
-        	        .setAuthentication(authToken);
-
-        	System.out.println(
-        	        "Authenticated User: "
-        	                + username);
-
-        } catch(Exception e) {
-
-            response.setStatus(
-                    HttpServletResponse.SC_UNAUTHORIZED);
-
-            response.getWriter().write(
-                    "Invalid Token");
-
-            return;
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authToken);
         }
 
         filterChain.doFilter(request, response);
