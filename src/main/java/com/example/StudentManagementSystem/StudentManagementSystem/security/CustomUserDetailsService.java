@@ -1,7 +1,7 @@
 package com.example.StudentManagementSystem.StudentManagementSystem.security;
 
-import com.example.StudentManagementSystem.StudentManagementSystem.repository.UserRepository;
-import com.example.StudentManagementSystem.StudentManagementSystem.entity.User;
+import com.example.StudentManagementSystem.StudentManagementSystem.User;
+import com.example.StudentManagementSystem.StudentManagementSystem.UserRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.*;
@@ -19,7 +19,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         User user = userRepository.findByUsername(username);
 
-        if(user == null) {
+        if (user == null) {
             throw new UsernameNotFoundException("User not found");
         }
 
